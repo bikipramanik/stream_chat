@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ class CreateAccountScreen extends StatefulWidget {
 
 class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final form = GlobalKey<FormState>();
+
+  bool _isLoading = false;
 
   String _enteredEmail = "";
 
@@ -33,6 +36,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     if (isValid) {
       form.currentState!.save();
       try {
+        setState(() {
+          _isLoading = true;
+        });
         final userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
               email: _enteredEmail,
@@ -44,15 +50,57 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             .child("${userCredential.user!.uid}.jpg");
         await storageRef.putFile(_pickedImage!);
         final imageUrl = await storageRef.getDownloadURL();
+
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(userCredential.user!.uid)
+            .set({
+              "username": _enteredUserName,
+              "email": _enteredEmail,
+              "imageurl": imageUrl,
+            });
+        setState(() {
+          _isLoading = false;
+        });
         print(" -------------------------------$imageUrl");
 
+        Navigator.pop(context);
         if (!mounted) {
           return;
         }
 
         print(userCredential);
-        Navigator.pop(context);
       } on FirebaseAuthException catch (error) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (!mounted) {
+          return;
+        }
+        String errorMessage;
+        switch (error.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already registered.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'weak-password':
+            errorMessage = 'Password must be at least 6 characters long.';
+            break;
+          default:
+            errorMessage = error.message ?? 'Account creation failed.';
+        }
+
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage)));
+      } on FirebaseException catch (error) {
+        setState(() {
+          _isLoading = false;
+        });
         if (!mounted) {
           return;
         }
@@ -197,30 +245,32 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           _enteredPassword = newValue!;
                         },
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: Text(
-                              "Already have an account",
-                              style: TextStyle(color: Colors.purple),
+                      if (!_isLoading)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: Text(
+                                "Already have an account",
+                                style: TextStyle(color: Colors.purple),
+                              ),
                             ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                              ),
+                              onPressed: onSubmit,
+                              child: Text(
+                                "Create Account",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
-                            onPressed: onSubmit,
-                            child: Text(
-                              "Create Account",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      if (_isLoading) const CircularProgressIndicator(),
                     ],
                   ),
                 ),

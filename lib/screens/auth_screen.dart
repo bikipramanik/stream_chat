@@ -12,6 +12,8 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final form = GlobalKey<FormState>();
 
+  bool _isLoading = false;
+
   String enteredEmail = "";
 
   String enteredPassword = "";
@@ -22,6 +24,9 @@ class _AuthScreenState extends State<AuthScreen> {
     if (isValid) {
       form.currentState!.save();
       try {
+        setState(() {
+          _isLoading = true;
+        });
         final userCredential = await FirebaseAuth.instance
             .signInWithEmailAndPassword(
               email: enteredEmail,
@@ -31,7 +36,14 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
         print(userCredential);
+
+        setState(() {
+          _isLoading = false;
+        });
       } on FirebaseAuthException catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
         if (!mounted) {
           return;
         }
@@ -146,36 +158,38 @@ class _AuthScreenState extends State<AuthScreen> {
                           enteredPassword = newValue!;
                         },
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const CreateAccountScreen(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              "Create New Account",
-                              style: TextStyle(color: Colors.purple),
+                      if (!_isLoading)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const CreateAccountScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                "Create New Account",
+                                style: TextStyle(color: Colors.purple),
+                              ),
                             ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                              ),
+                              onPressed: onSubmit,
+                              child: Text(
+                                "Log in",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
-                            onPressed: onSubmit,
-                            child: Text(
-                              "Log in",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      if (_isLoading) const CircularProgressIndicator(),
                     ],
                   ),
                 ),
