@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "201835203757",
+    "project_id": "stream-chat-app-8d0f4",
+    "storage_bucket": "stream-chat-app-8d0f4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:201835203757:android:03961869b70975c8d9ca24",
+        "android_client_info": {
+          "package_name": "com.example.stream_chat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFkVOWWh3cbg8uJwNe_bmjK3Pky1kwWeY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
