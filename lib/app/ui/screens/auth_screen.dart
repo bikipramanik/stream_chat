@@ -1,76 +1,50 @@
-import 'dart:io';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:stream_chat/app/widgets/user_image_picker.dart';
+import 'package:get/get.dart';
+import 'package:stream_chat/app/controllers/user_controller.dart';
+import 'package:stream_chat/app/ui/screens/create_account_screen.dart';
 
-class CreateAccountScreen extends StatefulWidget {
-  const CreateAccountScreen({super.key});
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
 
   @override
-  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _CreateAccountScreenState extends State<CreateAccountScreen> {
+class _AuthScreenState extends State<AuthScreen> {
   final form = GlobalKey<FormState>();
 
   bool _isLoading = false;
 
-  String _enteredEmail = "";
+  String enteredEmail = "";
 
-  String _enteredPassword = "";
-  String _enteredUserName = "";
-  File? _pickedImage;
+  String enteredPassword = "";
 
   void onSubmit() async {
     final isValid = form.currentState!.validate();
-    if (_pickedImage == null) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("You have to select an Image")));
-      return;
-    }
+
     if (isValid) {
       form.currentState!.save();
       try {
-        if (!mounted) {
-          return;
-        }
         setState(() {
           _isLoading = true;
         });
         final userCredential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-              email: _enteredEmail,
-              password: _enteredPassword,
+            .signInWithEmailAndPassword(
+              email: enteredEmail,
+              password: enteredPassword,
             );
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child("users_images")
-            .child("${userCredential.user!.uid}.jpg");
-        await storageRef.putFile(_pickedImage!);
-        final imageUrl = await storageRef.getDownloadURL();
-
-        await FirebaseFirestore.instance
-            .collection("users")
-            .doc(userCredential.user!.uid)
-            .set({
-              "username": _enteredUserName,
-              "email": _enteredEmail,
-              "imageurl": imageUrl,
-            });
-        setState(() {
-          _isLoading = false;
-        });
-        print(" -------------------------------$imageUrl");
-
-        Navigator.pop(context);
-
+        if (!mounted) {
+          return;
+        }
         print(userCredential);
-      } on FirebaseAuthException catch (error) {
+
+        setState(() {
+          _isLoading = false;
+        });
+        Get.delete<UserController>(force: true);
+        Get.put(UserController());
+      } on FirebaseAuthException catch (e) {
         setState(() {
           _isLoading = false;
         });
@@ -78,52 +52,32 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           return;
         }
         String errorMessage;
-        switch (error.code) {
-          case 'email-already-in-use':
-            errorMessage = 'This email is already registered.';
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'No user found for this email.';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Incorrect password. Please try again.';
             break;
           case 'invalid-email':
-            errorMessage = 'Please enter a valid email address.';
+            errorMessage = 'The email address is invalid.';
             break;
-          case 'weak-password':
-            errorMessage = 'Password must be at least 6 characters long.';
+          case 'user-disabled':
+            errorMessage = 'This user account has been disabled.';
+            break;
+          case 'invalid-credential':
+          case 'INVALID_LOGIN_CREDENTIALS':
+            errorMessage = 'User not found.';
             break;
           default:
-            errorMessage = error.message ?? 'Account creation failed.';
+            errorMessage = e.message ?? 'Authentication failed.';
         }
 
         ScaffoldMessenger.of(context).clearSnackBars();
-
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMessage)));
-      } on FirebaseException catch (error) {
-        setState(() {
-          _isLoading = false;
-        });
-        if (!mounted) {
-          return;
-        }
-        String errorMessage;
-        switch (error.code) {
-          case 'email-already-in-use':
-            errorMessage = 'This email is already registered.';
-            break;
-          case 'invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'weak-password':
-            errorMessage = 'Password must be at least 6 characters long.';
-            break;
-          default:
-            errorMessage = error.message ?? 'Account creation failed.';
-        }
-
-        ScaffoldMessenger.of(context).clearSnackBars();
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage)));
+        print("-----------------------$errorMessage");
       }
     }
   }
@@ -136,10 +90,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                child: Text("Create Account", style: TextStyle(fontSize: 50)),
-              ),
-
+              SizedBox(child: Text("Log In", style: TextStyle(fontSize: 50))),
               Container(
                 width: MediaQuery.of(context).size.width * 0.9,
                 padding: EdgeInsets.all(20),
@@ -152,11 +103,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   child: Column(
                     spacing: 10,
                     children: [
-                      UserImagePicker(
-                        onPickedImage: (pickedImage) {
-                          _pickedImage = pickedImage;
-                        },
-                      ),
                       TextFormField(
                         style: TextStyle(color: Colors.black),
                         cursorColor: Colors.blue,
@@ -185,36 +131,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         },
 
                         onSaved: (newValue) {
-                          _enteredEmail = newValue!;
-                        },
-                      ),
-                      TextFormField(
-                        style: TextStyle(color: Colors.black),
-                        cursorColor: Colors.blue,
-                        decoration: InputDecoration(
-                          labelText: "User Name",
-                          labelStyle: TextStyle(color: Colors.grey),
-                          floatingLabelStyle: TextStyle(color: Colors.blue),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey),
-                          ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          errorStyle: TextStyle(color: Colors.red),
-                        ),
-                        autocorrect: false,
-                        validator: (value) {
-                          if (value == null ||
-                              value.trim().isEmpty ||
-                              value.trim().length < 4) {
-                            return "User name must be atleast 4.";
-                          }
-                          return null;
-                        },
-
-                        onSaved: (newValue) {
-                          _enteredUserName = newValue!;
+                          enteredEmail = newValue!;
                         },
                       ),
                       TextFormField(
@@ -242,7 +159,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         },
 
                         onSaved: (newValue) {
-                          _enteredPassword = newValue!;
+                          enteredPassword = newValue!;
                         },
                       ),
                       if (!_isLoading)
@@ -251,10 +168,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           children: [
                             TextButton(
                               onPressed: () {
-                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const CreateAccountScreen(),
+                                  ),
+                                );
                               },
                               child: Text(
-                                "Already have an account",
+                                "Create New Account",
                                 style: TextStyle(color: Colors.purple),
                               ),
                             ),
@@ -264,7 +187,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                               ),
                               onPressed: onSubmit,
                               child: Text(
-                                "Create Account",
+                                "Log in",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),

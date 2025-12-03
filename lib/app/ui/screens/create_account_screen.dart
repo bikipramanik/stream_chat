@@ -1,46 +1,79 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:stream_chat/app/screens/create_account_screen.dart';
+import 'dart:io';
 
-class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:stream_chat/app/controllers/user_controller.dart';
+import 'package:stream_chat/app/ui/widgets/user_image_picker.dart';
+
+class CreateAccountScreen extends StatefulWidget {
+  const CreateAccountScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final form = GlobalKey<FormState>();
 
   bool _isLoading = false;
 
-  String enteredEmail = "";
+  String _enteredEmail = "";
 
-  String enteredPassword = "";
+  String _enteredPassword = "";
+  String _enteredUserName = "";
+  File? _pickedImage;
 
   void onSubmit() async {
     final isValid = form.currentState!.validate();
-
+    if (_pickedImage == null) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("You have to select an Image")));
+      return;
+    }
     if (isValid) {
       form.currentState!.save();
       try {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _isLoading = true;
         });
         final userCredential = await FirebaseAuth.instance
-            .signInWithEmailAndPassword(
-              email: enteredEmail,
-              password: enteredPassword,
+            .createUserWithEmailAndPassword(
+              email: _enteredEmail,
+              password: _enteredPassword,
             );
-        if (!mounted) {
-          return;
-        }
-        print(userCredential);
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child("users_images")
+            .child("${userCredential.user!.uid}.jpg");
+        await storageRef.putFile(_pickedImage!);
+        final imageUrl = await storageRef.getDownloadURL();
 
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(userCredential.user!.uid)
+            .set({
+              "username": _enteredUserName,
+              "email": _enteredEmail,
+              "imageurl": imageUrl,
+            });
         setState(() {
           _isLoading = false;
         });
-      } on FirebaseAuthException catch (e) {
+        print(" -------------------------------$imageUrl");
+
+        Navigator.pop(context);
+        Get.delete<UserController>(force: true);
+        Get.put(UserController());
+        print(userCredential);
+      } on FirebaseAuthException catch (error) {
         setState(() {
           _isLoading = false;
         });
@@ -48,32 +81,52 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
         String errorMessage;
-        switch (e.code) {
-          case 'user-not-found':
-            errorMessage = 'No user found for this email.';
-            break;
-          case 'wrong-password':
-            errorMessage = 'Incorrect password. Please try again.';
+        switch (error.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already registered.';
             break;
           case 'invalid-email':
-            errorMessage = 'The email address is invalid.';
+            errorMessage = 'Please enter a valid email address.';
             break;
-          case 'user-disabled':
-            errorMessage = 'This user account has been disabled.';
-            break;
-          case 'invalid-credential':
-          case 'INVALID_LOGIN_CREDENTIALS':
-            errorMessage = 'User not found.';
+          case 'weak-password':
+            errorMessage = 'Password must be at least 6 characters long.';
             break;
           default:
-            errorMessage = e.message ?? 'Authentication failed.';
+            errorMessage = error.message ?? 'Account creation failed.';
         }
 
         ScaffoldMessenger.of(context).clearSnackBars();
+
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMessage)));
-        print("-----------------------$errorMessage");
+      } on FirebaseException catch (error) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (!mounted) {
+          return;
+        }
+        String errorMessage;
+        switch (error.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already registered.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'weak-password':
+            errorMessage = 'Password must be at least 6 characters long.';
+            break;
+          default:
+            errorMessage = error.message ?? 'Account creation failed.';
+        }
+
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage)));
       }
     }
   }
@@ -86,7 +139,10 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(child: Text("Log In", style: TextStyle(fontSize: 50))),
+              SizedBox(
+                child: Text("Create Account", style: TextStyle(fontSize: 50)),
+              ),
+
               Container(
                 width: MediaQuery.of(context).size.width * 0.9,
                 padding: EdgeInsets.all(20),
@@ -99,6 +155,11 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     spacing: 10,
                     children: [
+                      UserImagePicker(
+                        onPickedImage: (pickedImage) {
+                          _pickedImage = pickedImage;
+                        },
+                      ),
                       TextFormField(
                         style: TextStyle(color: Colors.black),
                         cursorColor: Colors.blue,
@@ -127,7 +188,36 @@ class _AuthScreenState extends State<AuthScreen> {
                         },
 
                         onSaved: (newValue) {
-                          enteredEmail = newValue!;
+                          _enteredEmail = newValue!;
+                        },
+                      ),
+                      TextFormField(
+                        style: TextStyle(color: Colors.black),
+                        cursorColor: Colors.blue,
+                        decoration: InputDecoration(
+                          labelText: "User Name",
+                          labelStyle: TextStyle(color: Colors.grey),
+                          floatingLabelStyle: TextStyle(color: Colors.blue),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: Colors.grey),
+                          ),
+                          focusedBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: Colors.blue),
+                          ),
+                          errorStyle: TextStyle(color: Colors.red),
+                        ),
+                        autocorrect: false,
+                        validator: (value) {
+                          if (value == null ||
+                              value.trim().isEmpty ||
+                              value.trim().length < 4) {
+                            return "User name must be atleast 4.";
+                          }
+                          return null;
+                        },
+
+                        onSaved: (newValue) {
+                          _enteredUserName = newValue!;
                         },
                       ),
                       TextFormField(
@@ -155,7 +245,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         },
 
                         onSaved: (newValue) {
-                          enteredPassword = newValue!;
+                          _enteredPassword = newValue!;
                         },
                       ),
                       if (!_isLoading)
@@ -164,16 +254,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           children: [
                             TextButton(
                               onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const CreateAccountScreen(),
-                                  ),
-                                );
+                                Navigator.pop(context);
                               },
                               child: Text(
-                                "Create New Account",
+                                "Already have an account",
                                 style: TextStyle(color: Colors.purple),
                               ),
                             ),
@@ -183,7 +267,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                               onPressed: onSubmit,
                               child: Text(
-                                "Log in",
+                                "Create Account",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),

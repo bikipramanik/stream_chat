@@ -1,15 +1,31 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
-import 'package:stream_chat/app/models/user_model.dart';
+import 'package:stream_chat/app/data/models/user_model.dart';
 
 class UserController extends GetxController {
   Rx<UserModel?> currentUser = Rx<UserModel?>(null);
+  late final StreamSubscription _sub;
 
   @override
-  onInit() {
+  void onInit() {
     super.onInit();
-    fetchUser();
+
+    _sub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user == null) {
+        currentUser.value = null;
+      } else {
+        await fetchUser();
+      }
+    });
+  }
+
+  @override
+  void onClose() {
+    _sub.cancel();
+    super.onClose();
   }
 
   Future<void> fetchUser() async {
