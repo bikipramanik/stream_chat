@@ -10,12 +10,13 @@ class UserCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: Colors.white24,
-      child: Container(
+      child: SizedBox(
         height: Get.height * .1,
         width: double.infinity,
         child: Row(
           children: [
-            CircleAvatar(child: Image.network(imgUrl)),
+            CircleAvatar(backgroundImage: NetworkImage(imgUrl)),
+            const SizedBox(width: 10),
             Text(userName),
           ],
         ),

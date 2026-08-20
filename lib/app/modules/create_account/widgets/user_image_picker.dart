@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class UserImagePicker extends StatefulWidget {
   const UserImagePicker({super.key, required this.onPickedImage});
@@ -41,11 +41,12 @@ class _UserImagePickerState extends State<UserImagePicker> {
               ? FileImage(_pickedImageFile!)
               : null,
         ),
+        const SizedBox(height: 8),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent),
           onPressed: _pickedImage,
-          icon: Icon(Icons.add_a_photo, color: Colors.white),
-          label: Text("Add photo", style: TextStyle(color: Colors.white)),
+          icon: const Icon(Icons.add_a_photo, color: Colors.white),
+          label: const Text("Add photo", style: TextStyle(color: Colors.white)),
         ),
       ],
     );
