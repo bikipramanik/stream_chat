@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:stream_chat/app/modules/create_account/controllers/create_account_controller.dart';
 import 'package:stream_chat/app/modules/create_account/widgets/user_image_picker.dart';
+import 'package:stream_chat/app/theme/app_theme.dart';
 
 class CreateAccountView extends GetView<CreateAccountController> {
   const CreateAccountView({super.key});
@@ -9,139 +10,181 @@ class CreateAccountView extends GetView<CreateAccountController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text("Create Account", style: TextStyle(fontSize: 50)),
-              const SizedBox(height: 20),
-              Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Form(
-                  key: controller.formKey,
-                  child: Column(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    "Create Account",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Join StreamChat and start connecting today",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Profile Image Picker
+                  UserImagePicker(
+                    onPickedImage: controller.setImage,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Form Card Surface
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.surfaceColorLight,
+                        width: 1,
+                      ),
+                    ),
+                    child: Form(
+                      key: controller.formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Full Name / Username Field
+                          TextFormField(
+                            controller: controller.userNameController,
+                            style: const TextStyle(color: AppTheme.textPrimary),
+                            autocorrect: false,
+                            decoration: const InputDecoration(
+                              labelText: "Username",
+                              hintText: "alex_dev",
+                              prefixIcon: Icon(Icons.person_outline_rounded),
+                            ),
+                            validator: (value) {
+                              if (value == null ||
+                                  value.trim().isEmpty ||
+                                  value.trim().length < 4) {
+                                return "Username must be at least 4 characters";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Email Address Field
+                          TextFormField(
+                            controller: controller.emailController,
+                            style: const TextStyle(color: AppTheme.textPrimary),
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            decoration: const InputDecoration(
+                              labelText: "Email Address",
+                              hintText: "name@example.com",
+                              prefixIcon: Icon(Icons.mail_outline_rounded),
+                            ),
+                            validator: (value) {
+                              if (value == null ||
+                                  value.trim().isEmpty ||
+                                  !value.contains('@')) {
+                                return "Please enter a valid email address";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Password Field
+                          Obx(() => TextFormField(
+                                controller: controller.passwordController,
+                                style: const TextStyle(color: AppTheme.textPrimary),
+                                obscureText: !controller.isPasswordVisible.value,
+                                decoration: InputDecoration(
+                                  labelText: "Password",
+                                  hintText: "••••••••",
+                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      controller.isPasswordVisible.value
+                                          ? Icons.visibility_off_rounded
+                                          : Icons.visibility_rounded,
+                                    ),
+                                    onPressed: controller.togglePasswordVisibility,
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().length < 6) {
+                                    return "Password must be at least 6 characters";
+                                  }
+                                  return null;
+                                },
+                              )),
+                          const SizedBox(height: 24),
+
+                          // Submit CTA Button
+                          Obx(() => SizedBox(
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: controller.isLoading.value
+                                      ? null
+                                      : controller.createAccount,
+                                  child: controller.isLoading.value
+                                      ? const SizedBox(
+                                          height: 22,
+                                          width: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text("Create Account"),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Login link
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      UserImagePicker(
-                        onPickedImage: controller.setImage,
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: controller.emailController,
-                        style: const TextStyle(color: Colors.black),
-                        cursorColor: Colors.blue,
-                        decoration: const InputDecoration(
-                          labelText: "Email Address",
-                          labelStyle: TextStyle(color: Colors.grey),
-                          floatingLabelStyle: TextStyle(color: Colors.blue),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey),
-                          ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          errorStyle: TextStyle(color: Colors.red),
+                      const Text(
+                        "Already have an account? ",
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 14,
                         ),
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        validator: (value) {
-                          if (value == null ||
-                              value.trim().isEmpty ||
-                              !value.contains('@')) {
-                            return "Please enter a valid email address.";
-                          }
-                          return null;
-                        },
                       ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: controller.userNameController,
-                        style: const TextStyle(color: Colors.black),
-                        cursorColor: Colors.blue,
-                        decoration: const InputDecoration(
-                          labelText: "User Name",
-                          labelStyle: TextStyle(color: Colors.grey),
-                          floatingLabelStyle: TextStyle(color: Colors.blue),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey),
+                      GestureDetector(
+                        onTap: controller.goToLogin,
+                        child: const Text(
+                          "Sign In",
+                          style: TextStyle(
+                            color: AppTheme.secondaryColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          errorStyle: TextStyle(color: Colors.red),
                         ),
-                        autocorrect: false,
-                        validator: (value) {
-                          if (value == null ||
-                              value.trim().isEmpty ||
-                              value.trim().length < 4) {
-                            return "User name must be at least 4 characters.";
-                          }
-                          return null;
-                        },
                       ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: controller.passwordController,
-                        style: const TextStyle(color: Colors.black),
-                        decoration: const InputDecoration(
-                          labelText: "Password",
-                          labelStyle: TextStyle(color: Colors.grey),
-                          floatingLabelStyle: TextStyle(color: Colors.blue),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey),
-                          ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          errorStyle: TextStyle(color: Colors.red),
-                        ),
-                        obscureText: true,
-                        validator: (value) {
-                          if (value == null || value.trim().length < 6) {
-                            return "Password must be at least 6 characters long.";
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Obx(() {
-                        if (controller.isLoading.value) {
-                          return const CircularProgressIndicator();
-                        }
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextButton(
-                              onPressed: controller.goToLogin,
-                              child: const Text(
-                                "Already have an account",
-                                style: TextStyle(color: Colors.purple),
-                              ),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                              ),
-                              onPressed: controller.createAccount,
-                              child: const Text(
-                                "Create Account",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        );
-                      }),
                     ],
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

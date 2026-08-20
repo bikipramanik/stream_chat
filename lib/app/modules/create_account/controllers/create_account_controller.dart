@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
 import 'package:stream_chat/app/data/services/auth_service.dart';
 import 'package:stream_chat/app/routes/app_pages.dart';
+import 'package:stream_chat/app/theme/app_theme.dart';
 
 class CreateAccountController extends GetxController {
   final emailController = TextEditingController();
@@ -16,6 +17,7 @@ class CreateAccountController extends GetxController {
 
   final Rxn<File> pickedImage = Rxn<File>();
   final isLoading = false.obs;
+  final isPasswordVisible = false.obs;
 
   @override
   void onClose() {
@@ -29,15 +31,21 @@ class CreateAccountController extends GetxController {
     pickedImage.value = image;
   }
 
+  void togglePasswordVisibility() {
+    isPasswordVisible.value = !isPasswordVisible.value;
+  }
+
   Future<void> createAccount() async {
     if (pickedImage.value == null) {
       Get.snackbar(
         'Image Required',
-        'You have to select an Image',
+        'Please select a profile picture to continue.',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orangeAccent,
+        backgroundColor: Colors.orange.withValues(alpha: 0.9),
         colorText: Colors.white,
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        icon: const Icon(Icons.add_a_photo_outlined, color: Colors.white),
       );
       return;
     }
@@ -80,7 +88,7 @@ class CreateAccountController extends GetxController {
       String errorMessage;
       switch (error.code) {
         case 'email-already-in-use':
-          errorMessage = 'This email is already registered.';
+          errorMessage = 'This email address is already registered.';
           break;
         case 'invalid-email':
           errorMessage = 'Please enter a valid email address.';
@@ -95,18 +103,20 @@ class CreateAccountController extends GetxController {
         'Sign Up Error',
         errorMessage,
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppTheme.errorColor.withValues(alpha: 0.9),
         colorText: Colors.white,
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
       );
     } catch (e) {
       Get.snackbar(
         'Error',
         'An unexpected error occurred.',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppTheme.errorColor.withValues(alpha: 0.9),
         colorText: Colors.white,
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
       );
     } finally {
       isLoading.value = false;

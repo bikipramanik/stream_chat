@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:stream_chat/app/data/services/auth_service.dart';
 import 'package:stream_chat/app/routes/app_pages.dart';
+import 'package:stream_chat/app/theme/app_theme.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -26,6 +27,9 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       title: 'Stream Chat',
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
       initialRoute: initialRoute,
       getPages: AppPages.routes,
     );

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:stream_chat/app/routes/app_pages.dart';
+import 'package:stream_chat/app/theme/app_theme.dart';
 
 class AuthController extends GetxController {
   final emailController = TextEditingController();
@@ -9,12 +10,17 @@ class AuthController extends GetxController {
   final formKey = GlobalKey<FormState>();
 
   final isLoading = false.obs;
+  final isPasswordVisible = false.obs;
 
   @override
   void onClose() {
     emailController.dispose();
     passwordController.dispose();
     super.onClose();
+  }
+
+  void togglePasswordVisibility() {
+    isPasswordVisible.value = !isPasswordVisible.value;
   }
 
   Future<void> signIn() async {
@@ -32,7 +38,7 @@ class AuthController extends GetxController {
       String errorMessage;
       switch (e.code) {
         case 'user-not-found':
-          errorMessage = 'No user found for this email.';
+          errorMessage = 'No user found with this email.';
           break;
         case 'wrong-password':
           errorMessage = 'Incorrect password. Please try again.';
@@ -45,27 +51,30 @@ class AuthController extends GetxController {
           break;
         case 'invalid-credential':
         case 'INVALID_LOGIN_CREDENTIALS':
-          errorMessage = 'User not found or invalid credentials.';
+          errorMessage = 'Invalid email or password.';
           break;
         default:
           errorMessage = e.message ?? 'Authentication failed.';
       }
       Get.snackbar(
-        'Authentication Error',
+        'Sign In Failed',
         errorMessage,
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppTheme.errorColor.withValues(alpha: 0.9),
         colorText: Colors.white,
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        icon: const Icon(Icons.error_outline, color: Colors.white),
       );
     } catch (e) {
       Get.snackbar(
         'Error',
         'An unexpected error occurred.',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppTheme.errorColor.withValues(alpha: 0.9),
         colorText: Colors.white,
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
       );
     } finally {
       isLoading.value = false;
