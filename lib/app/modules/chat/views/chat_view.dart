@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
 import 'package:stream_chat/app/modules/chat/controllers/chat_controller.dart';
+import 'package:stream_chat/app/modules/chat/views/individual_chat_view.dart';
 import 'package:stream_chat/app/modules/chat/widgets/user_card.dart';
 import 'package:stream_chat/app/theme/app_theme.dart';
 
@@ -155,15 +156,7 @@ class ChatView extends GetView<ChatController> {
                     return UserCard(
                       user: user,
                       onTap: () {
-                        Get.snackbar(
-                          "Start Chat",
-                          "Chatting with ${user.userName}",
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.9),
-                          colorText: Colors.white,
-                          margin: const EdgeInsets.all(16),
-                          borderRadius: 12,
-                        );
+                        Get.to(() => IndividualChatView(targetUser: user));
                       },
                     );
                   },
