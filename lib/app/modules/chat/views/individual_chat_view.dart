@@ -3,8 +3,11 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stream_chat/app/data/models/chat_message_model.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
+import 'package:stream_chat/app/data/services/auth_service.dart';
+import 'package:stream_chat/app/modules/call/controllers/call_controller.dart';
 import 'package:stream_chat/app/modules/chat/controllers/individual_chat_controller.dart';
 import 'package:stream_chat/app/modules/chat/widgets/chat_bubble.dart';
+import 'package:stream_chat/app/routes/app_pages.dart';
 import 'package:stream_chat/app/theme/app_theme.dart';
 
 class IndividualChatView extends StatefulWidget {
@@ -149,6 +152,23 @@ class _IndividualChatViewState extends State<IndividualChatView> {
     );
   }
 
+  void _startCall(CallType callType) {
+    final currentUid = AuthService.to.currentUser.value?.uid ?? 'user1';
+    final targetUid = widget.targetUser.uid;
+    final uids = [currentUid, targetUid]..sort();
+    final channelId = "call_${uids[0]}_${uids[1]}";
+
+    Get.toNamed(
+      Routes.CALL,
+      arguments: {
+        'channelId': channelId,
+        'callType': callType,
+        'targetUser': widget.targetUser,
+        'isIncoming': false,
+      },
+    );
+  }
+
   void _showUserProfile() {
     showModalBottomSheet(
       context: context,
@@ -196,9 +216,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                   OutlinedButton.icon(
                     onPressed: () {
                       Get.back();
-                      Get.snackbar("Call", "Calling ${widget.targetUser.userName}...",
-                          backgroundColor: AppTheme.primaryColor,
-                          colorText: Colors.white);
+                      _startCall(CallType.audio);
                     },
                     icon: const Icon(Icons.phone_rounded),
                     label: const Text("Audio Call"),
@@ -206,9 +224,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                   ElevatedButton.icon(
                     onPressed: () {
                       Get.back();
-                      Get.snackbar("Video Call", "Video calling ${widget.targetUser.userName}...",
-                          backgroundColor: AppTheme.primaryColor,
-                          colorText: Colors.white);
+                      _startCall(CallType.video);
                     },
                     icon: const Icon(Icons.videocam_rounded),
                     label: const Text("Video Call"),
@@ -268,17 +284,11 @@ class _IndividualChatViewState extends State<IndividualChatView> {
         actions: [
           IconButton(
             icon: const Icon(Icons.phone_outlined, color: AppTheme.textPrimary),
-            onPressed: () {
-              Get.snackbar("Audio Call", "Calling ${widget.targetUser.userName}...",
-                  backgroundColor: AppTheme.surfaceColor, colorText: AppTheme.textPrimary);
-            },
+            onPressed: () => _startCall(CallType.audio),
           ),
           IconButton(
             icon: const Icon(Icons.videocam_outlined, color: AppTheme.textPrimary),
-            onPressed: () {
-              Get.snackbar("Video Call", "Starting video call...",
-                  backgroundColor: AppTheme.surfaceColor, colorText: AppTheme.textPrimary);
-            },
+            onPressed: () => _startCall(CallType.video),
           ),
           IconButton(
             icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textPrimary),

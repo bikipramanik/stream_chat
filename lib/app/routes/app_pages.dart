@@ -9,6 +9,9 @@ import '../modules/chat/views/chat_view.dart';
 import '../modules/create_account/bindings/create_account_binding.dart';
 import '../modules/create_account/views/create_account_view.dart';
 
+import '../modules/call/bindings/call_binding.dart';
+import '../modules/call/views/call_view.dart';
+
 part 'app_routes.dart';
 
 class AppPages {
@@ -31,6 +34,11 @@ class AppPages {
       name: _Paths.CHAT,
       page: () => const ChatView(),
       binding: ChatBinding(),
+    ),
+    GetPage(
+      name: _Paths.CALL,
+      page: () => const CallView(),
+      binding: CallBinding(),
     ),
   ];
 }
