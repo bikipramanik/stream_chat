@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
 import 'package:stream_chat/app/data/services/auth_service.dart';
+import 'package:stream_chat/app/data/services/call_service.dart';
 import 'package:stream_chat/const.dart';
 
 enum CallType { audio, video }
@@ -14,10 +17,12 @@ class CallController extends GetxController {
   late final CallType callType;
   late final UserModel targetUser;
   late final bool isIncomingCall;
+  late final String callDocId;
 
   final callState = CallState.outgoing.obs;
   final callSeconds = 0.obs;
   Timer? _timer;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callDocSub;
 
   RtcEngine? rtcEngine;
   final isEngineInitialized = false.obs;
@@ -31,6 +36,7 @@ class CallController extends GetxController {
   final remoteUid = RxnInt();
 
   UserModel? get currentUser => AuthService.to.currentUser.value;
+  String get activeChannelId => channelName.isNotEmpty ? channelName : channelId;
 
   String get formattedDuration {
     final minutes = (callSeconds.value ~/ 60).toString().padLeft(2, '0');
@@ -43,7 +49,7 @@ class CallController extends GetxController {
       case CallState.incoming:
         return "Incoming ${callType == CallType.video ? 'Video' : 'Audio'} Call...";
       case CallState.outgoing:
-        return "Connecting...";
+        return "Ringing...";
       case CallState.connected:
         return formattedDuration;
       case CallState.ended:
@@ -66,35 +72,63 @@ class CallController extends GetxController {
           imgUrl: '',
         );
     isIncomingCall = args['isIncoming'] as bool? ?? false;
+    callDocId = args['callDocId'] ??
+        (isIncomingCall
+            ? "${targetUser.uid}_${currentUser?.uid ?? 'me'}"
+            : "${currentUser?.uid ?? 'me'}_${targetUser.uid}");
 
     isVideoEnabled.value = (callType == CallType.video);
 
+    debugPrint("🎬 [CALL INIT] CallType: $callType | Target: ${targetUser.userName} | Incoming: $isIncomingCall | DocID: $callDocId");
+
+    _listenToCallDoc();
+
     if (isIncomingCall) {
       callState.value = CallState.incoming;
+      debugPrint("🔔 [CALL STATE] Set to INCOMING");
     } else {
       callState.value = CallState.outgoing;
+      debugPrint("📞 [CALL STATE] Set to OUTGOING (Connecting...)");
       _initAgoraEngineAndJoin();
     }
   }
 
+  void _listenToCallDoc() {
+    debugPrint("👂 [CALL FIRESTORE] Listening to call document: $callDocId");
+    _callDocSub = CallService.to.listenToCall(callDocId).listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final status = snapshot.data()!['status'];
+        debugPrint("🔥 [CALL FIRESTORE UPDATE] Status is now: '$status'");
+        if (status == 'declined' || status == 'ended') {
+          debugPrint("🚫 [CALL FIRESTORE] Call was declined or ended remotely.");
+          endCall(updateFirestore: false);
+        } else if (status == 'accepted' && callState.value == CallState.outgoing) {
+          debugPrint("✅ [CALL FIRESTORE] Remote user accepted the call!");
+          _startCallTimer();
+          callState.value = CallState.connected;
+        }
+      }
+    });
+  }
+
   Future<void> acceptCall() async {
+    debugPrint("🟢 [CALL ACTION] Accept Call pressed by recipient");
     callState.value = CallState.outgoing;
+    await CallService.to.acceptCall(callDocId);
     await _initAgoraEngineAndJoin();
   }
 
   Future<void> _initAgoraEngineAndJoin() async {
     try {
-      // Request Camera & Mic permissions
+      debugPrint("🔐 [AGORA PERMISSIONS] Requesting Camera & Microphone permissions...");
       final statuses = await [
         Permission.microphone,
         Permission.camera,
       ].request();
 
-      if (statuses[Permission.microphone] != PermissionStatus.granted) {
-        Get.log("Microphone permission denied");
-      }
+      debugPrint("🎙️ Mic status: ${statuses[Permission.microphone]} | 📷 Camera status: ${statuses[Permission.camera]}");
 
-      // Initialize Agora RtcEngine
+      debugPrint("🚀 [AGORA INIT] Creating RtcEngine with AppId: $agoraAppId");
       final engine = createAgoraRtcEngine();
       await engine.initialize(const RtcEngineContext(
         appId: agoraAppId,
@@ -105,98 +139,152 @@ class CallController extends GetxController {
       engine.registerEventHandler(
         RtcEngineEventHandler(
           onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-            Get.log("Agora local joined channel: ${connection.channelId}");
+            debugPrint("🟢 [AGORA SUCCESS] Local user joined channel! Channel: '${connection.channelId}', Local UID: ${connection.localUid}, Elapsed: ${elapsed}ms");
             localUid.value = connection.localUid ?? 0;
+
+            // Enable speakerphone safely once joined
+            try {
+              rtcEngine?.setEnableSpeakerphone(true);
+              isSpeakerOn.value = true;
+            } catch (e) {
+              debugPrint("⚠️ [AGORA SPEAKER ON JOIN ERROR] $e");
+            }
+
+            // Only start timer if remote user is already connected
             if (remoteUid.value != null) {
-              _startCallTimer();
               callState.value = CallState.connected;
+              _startCallTimer(reset: true);
             }
           },
           onUserJoined: (RtcConnection connection, int remoteUidParam, int elapsed) {
-            Get.log("Agora remote user joined: $remoteUidParam");
+            debugPrint("🎉 [AGORA REMOTE JOINED] Remote UID: $remoteUidParam joined channel '${connection.channelId}' after ${elapsed}ms!");
             remoteUid.value = remoteUidParam;
-            _startCallTimer();
             callState.value = CallState.connected;
+            _startCallTimer(reset: true);
           },
           onUserOffline:
               (RtcConnection connection, int remoteUidParam, UserOfflineReasonType reason) {
-            Get.log("Agora remote user left: $remoteUidParam");
+            debugPrint("👋 [AGORA REMOTE LEFT] Remote UID: $remoteUidParam left channel. Reason: $reason");
             remoteUid.value = null;
-            endCall();
           },
           onError: (ErrorCodeType err, String msg) {
-            Get.log("Agora Error [$err]: $msg");
+            debugPrint("❌ [AGORA ERROR] Code: $err, Message: $msg");
+          },
+          onConnectionStateChanged: (RtcConnection connection, ConnectionStateType state, ConnectionChangedReasonType reason) {
+            debugPrint("🔄 [AGORA CONNECTION STATE] State: $state, Reason: $reason");
+          },
+          onTokenPrivilegeWillExpire: (RtcConnection connection, String token) {
+            debugPrint("⚠️ [AGORA WARNING] Token privilege will expire soon!");
           },
         ),
       );
 
       if (callType == CallType.video) {
+        debugPrint("📹 [AGORA MEDIA] Enabling Video & Starting Local Preview...");
         await engine.enableVideo();
         await engine.startPreview();
       } else {
+        debugPrint("🎙️ [AGORA MEDIA] Enabling Audio Mode...");
         await engine.enableAudio();
       }
 
+      // Default audio routing to speakerphone
+      try {
+        await engine.setDefaultAudioRouteToSpeakerphone(true);
+      } catch (e) {
+        debugPrint("⚠️ [AGORA AUDIO ROUTE ERROR] $e");
+      }
+
+      final tokenToUse = agoraToken.isNotEmpty ? agoraToken : '';
+      final channelToJoin = activeChannelId;
+      
+      // Each user MUST have a unique integer UID in an Agora channel for audio/video to route properly!
+      final uidToUse = currentUser != null
+          ? (currentUser!.uid.hashCode & 0x3FFFFFFF)
+          : (DateTime.now().millisecondsSinceEpoch % 100000 + 1);
+
+      debugPrint("📡 [AGORA JOIN] Joining Channel '$channelToJoin' with Unique UID: $uidToUse...");
       await engine.joinChannel(
-        token: '',
-        channelId: channelId,
-        uid: 0,
+        token: tokenToUse,
+        channelId: channelToJoin,
+        uid: uidToUse,
         options: ChannelMediaOptions(
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
           channelProfile: ChannelProfileType.channelProfileCommunication,
           publishCameraTrack: callType == CallType.video,
           publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: callType == CallType.video,
         ),
       );
 
       isEngineInitialized.value = true;
-    } catch (e) {
-      Get.log("Error initializing Agora: $e");
+      debugPrint("✨ [AGORA INIT COMPLETE] Engine initialized successfully.");
+    } catch (e, stack) {
+      debugPrint("💥 [AGORA INIT EXCEPTION] Error: $e\n$stack");
     }
   }
 
-  void _startCallTimer() {
-    if (_timer != null) return;
-    callSeconds.value = 0;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      callSeconds.value++;
-    });
+  void _startCallTimer({bool reset = false}) {
+    if (reset || _timer == null) {
+      _timer?.cancel();
+      callSeconds.value = 0;
+      debugPrint("⏱️ [CALL TIMER] Starting minute/second call duration timer from 00:00.");
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        callSeconds.value++;
+      });
+    }
   }
 
   void toggleMute() {
     isMuted.value = !isMuted.value;
+    debugPrint("🎙️ [CALL ACTION] Mic Muted: ${isMuted.value}");
     rtcEngine?.muteLocalAudioStream(isMuted.value);
   }
 
   void toggleVideo() {
     if (callType != CallType.video) return;
     isVideoEnabled.value = !isVideoEnabled.value;
+    debugPrint("📷 [CALL ACTION] Video Enabled: ${isVideoEnabled.value}");
     rtcEngine?.muteLocalVideoStream(!isVideoEnabled.value);
   }
 
   void switchCamera() {
     if (callType != CallType.video) return;
     isFrontCamera.value = !isFrontCamera.value;
+    debugPrint("🔄 [CALL ACTION] Switch Camera to ${isFrontCamera.value ? 'Front' : 'Rear'}");
     rtcEngine?.switchCamera();
   }
 
   void toggleSpeaker() {
     isSpeakerOn.value = !isSpeakerOn.value;
-    rtcEngine?.setEnableSpeakerphone(isSpeakerOn.value);
+    debugPrint("🔊 [CALL ACTION] Speaker On: ${isSpeakerOn.value}");
+    try {
+      rtcEngine?.setEnableSpeakerphone(isSpeakerOn.value);
+    } catch (e) {
+      debugPrint("⚠️ [AGORA SPEAKER TOGGLE ERROR] $e");
+    }
   }
 
-  void endCall() {
+  void endCall({bool updateFirestore = true}) {
     if (callState.value == CallState.ended) return;
+    debugPrint("🔴 [CALL END] Ending Call. Update Firestore: $updateFirestore");
     callState.value = CallState.ended;
     _timer?.cancel();
     _timer = null;
+    _callDocSub?.cancel();
+
+    if (updateFirestore) {
+      CallService.to.endCall(callDocId);
+    }
 
     try {
       rtcEngine?.leaveChannel();
       rtcEngine?.release();
       rtcEngine = null;
+      debugPrint("🧹 [AGORA CLEANUP] Left channel and released engine.");
     } catch (e) {
-      Get.log("Error leaving channel: $e");
+      debugPrint("⚠️ [AGORA CLEANUP ERROR] $e");
     }
 
     Get.back();
@@ -204,7 +292,9 @@ class CallController extends GetxController {
 
   @override
   void onClose() {
+    debugPrint("🚪 [CALL CONTROLLER CLOSE] Cleaning up resources.");
     _timer?.cancel();
+    _callDocSub?.cancel();
     try {
       rtcEngine?.leaveChannel();
       rtcEngine?.release();

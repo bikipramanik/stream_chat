@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:stream_chat/app/data/models/chat_message_model.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
 import 'package:stream_chat/app/data/services/auth_service.dart';
+import 'package:stream_chat/app/data/services/call_service.dart';
 import 'package:stream_chat/app/modules/call/controllers/call_controller.dart';
 import 'package:stream_chat/app/modules/chat/controllers/individual_chat_controller.dart';
 import 'package:stream_chat/app/modules/chat/widgets/chat_bubble.dart';
@@ -152,11 +153,17 @@ class _IndividualChatViewState extends State<IndividualChatView> {
     );
   }
 
-  void _startCall(CallType callType) {
+  void _startCall(CallType callType) async {
     final currentUid = AuthService.to.currentUser.value?.uid ?? 'user1';
     final targetUid = widget.targetUser.uid;
     final uids = [currentUid, targetUid]..sort();
     final channelId = "call_${uids[0]}_${uids[1]}";
+
+    final callModel = await CallService.to.makeCall(
+      receiver: widget.targetUser,
+      callType: callType,
+      channelId: channelId,
+    );
 
     Get.toNamed(
       Routes.CALL,
@@ -165,6 +172,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
         'callType': callType,
         'targetUser': widget.targetUser,
         'isIncoming': false,
+        'callDocId': callModel?.docId ?? "${currentUid}_$targetUid",
       },
     );
   }

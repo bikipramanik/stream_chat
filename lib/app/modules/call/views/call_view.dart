@@ -262,7 +262,7 @@ class CallView extends GetView<CallController> {
         controller: VideoViewController.remote(
           rtcEngine: rtcEngine,
           canvas: VideoCanvas(uid: remoteUid),
-          connection: RtcConnection(channelId: controller.channelId),
+          connection: RtcConnection(channelId: controller.activeChannelId),
         ),
       );
     }
