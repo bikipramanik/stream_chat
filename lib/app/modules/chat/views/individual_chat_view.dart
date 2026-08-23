@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:stream_chat/app/data/models/chat_message_model.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
+import 'package:stream_chat/app/modules/chat/controllers/individual_chat_controller.dart';
 import 'package:stream_chat/app/modules/chat/widgets/chat_bubble.dart';
 import 'package:stream_chat/app/theme/app_theme.dart';
 
@@ -18,89 +20,21 @@ class IndividualChatView extends StatefulWidget {
 }
 
 class _IndividualChatViewState extends State<IndividualChatView> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  final List<ChatMessageModel> _messages = [];
-  bool _isComposing = false;
+  late final IndividualChatController controller;
 
   @override
   void initState() {
     super.initState();
-    _loadSampleMessages();
-  }
-
-  void _loadSampleMessages() {
-    final now = DateTime.now();
-    _messages.addAll([
-      ChatMessageModel(
-        id: '1',
-        senderId: widget.targetUser.uid,
-        text: 'Hey! 👋 Welcome to StreamChat!',
-        isMe: false,
-        timestamp: now.subtract(const Duration(minutes: 15)),
-      ),
-      ChatMessageModel(
-        id: '2',
-        senderId: widget.targetUser.uid,
-        text: 'How is the new UI refactoring coming along?',
-        isMe: false,
-        timestamp: now.subtract(const Duration(minutes: 14)),
-      ),
-      ChatMessageModel(
-        id: '3',
-        senderId: 'me',
-        text: 'Hey @${widget.targetUser.userName}! Everything is super smooth with GetX and modern Flutter widgets 🚀',
-        isMe: true,
-        timestamp: now.subtract(const Duration(minutes: 10)),
-      ),
-      ChatMessageModel(
-        id: '4',
-        senderId: widget.targetUser.uid,
-        text: 'That looks fantastic! Let me know if you want to test instant messaging or voice calls.',
-        isMe: false,
-        timestamp: now.subtract(const Duration(minutes: 5)),
-      ),
-    ]);
+    controller = Get.put(
+      IndividualChatController(targetUser: widget.targetUser),
+      tag: widget.targetUser.uid,
+    );
   }
 
   @override
   void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
+    Get.delete<IndividualChatController>(tag: widget.targetUser.uid);
     super.dispose();
-  }
-
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() {
-      _messages.add(
-        ChatMessageModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          senderId: 'me',
-          text: text,
-          isMe: true,
-          timestamp: DateTime.now(),
-        ),
-      );
-      _messageController.clear();
-      _isComposing = false;
-    });
-
-    _scrollToBottom();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   void _showAttachmentOptions() {
@@ -143,9 +77,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                     label: 'Camera',
                     onTap: () {
                       Get.back();
-                      Get.snackbar("Camera", "Camera action clicked",
-                          backgroundColor: AppTheme.surfaceColor,
-                          colorText: AppTheme.textPrimary);
+                      controller.pickAndSendImage(ImageSource.camera);
                     },
                   ),
                   _buildAttachmentItem(
@@ -154,9 +86,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                     label: 'Gallery',
                     onTap: () {
                       Get.back();
-                      Get.snackbar("Gallery", "Gallery action clicked",
-                          backgroundColor: AppTheme.surfaceColor,
-                          colorText: AppTheme.textPrimary);
+                      controller.pickAndSendImage(ImageSource.gallery);
                     },
                   ),
                   _buildAttachmentItem(
@@ -165,7 +95,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                     label: 'Document',
                     onTap: () {
                       Get.back();
-                      Get.snackbar("Document", "Document action clicked",
+                      Get.snackbar("Document", "Document sharing coming soon!",
                           backgroundColor: AppTheme.surfaceColor,
                           colorText: AppTheme.textPrimary);
                     },
@@ -176,7 +106,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                     label: 'Audio',
                     onTap: () {
                       Get.back();
-                      Get.snackbar("Audio", "Audio action clicked",
+                      Get.snackbar("Audio", "Audio sharing coming soon!",
                           backgroundColor: AppTheme.surfaceColor,
                           colorText: AppTheme.textPrimary);
                     },
@@ -308,60 +238,27 @@ class _IndividualChatViewState extends State<IndividualChatView> {
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
             child: Row(
               children: [
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppTheme.surfaceColorLight,
-                      backgroundImage: widget.targetUser.imgUrl.isNotEmpty
-                          ? NetworkImage(widget.targetUser.imgUrl)
-                          : null,
-                      child: widget.targetUser.imgUrl.isEmpty
-                          ? const Icon(Icons.person, size: 20, color: AppTheme.textSecondary)
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: AppTheme.onlineColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.surfaceColor,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppTheme.surfaceColorLight,
+                  backgroundImage: widget.targetUser.imgUrl.isNotEmpty
+                      ? NetworkImage(widget.targetUser.imgUrl)
+                      : null,
+                  child: widget.targetUser.imgUrl.isEmpty
+                      ? const Icon(Icons.person, size: 20, color: AppTheme.textSecondary)
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.targetUser.userName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        "Online",
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.onlineColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    widget.targetUser.userName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -389,20 +286,98 @@ class _IndividualChatViewState extends State<IndividualChatView> {
           ),
         ],
       ),
+      
       body: SafeArea(
         child: Column(
           children: [
-            // Chat Messages List
+            // Uploading progress banner
+            Obx(() {
+              if (controller.isUploading.value) {
+                return const LinearProgressIndicator(
+                  backgroundColor: AppTheme.surfaceColor,
+                  color: AppTheme.primaryColor,
+                  minHeight: 3,
+                );
+              }
+              return const SizedBox.shrink();
+            }),
+
+            // Real-time Chat Messages List
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final message = _messages[index];
-                  return ChatBubble(
-                    message: message,
-                    userAvatarUrl: widget.targetUser.imgUrl,
+              child: StreamBuilder<List<ChatMessageModel>>(
+                stream: controller.getMessagesStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        "Error loading messages: ${snapshot.error}",
+                        style: const TextStyle(color: AppTheme.errorColor),
+                      ),
+                    );
+                  }
+
+                  final messages = snapshot.data ?? [];
+
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppTheme.surfaceColorLight),
+                            ),
+                            child: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 40,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            "Say 👋 to @${widget.targetUser.userName}!",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "No messages here yet. Start the conversation!",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Auto scroll to bottom when new message arrives
+                  controller.scrollToBottom();
+
+                  return ListView.builder(
+                    controller: controller.scrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      return ChatBubble(
+                        message: message,
+                        userAvatarUrl: widget.targetUser.imgUrl,
+                      );
+                    },
                   );
                 },
               ),
@@ -444,7 +419,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: _messageController,
+                              controller: controller.messageController,
                               style: const TextStyle(
                                 color: AppTheme.textPrimary,
                                 fontSize: 14,
@@ -458,12 +433,7 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                                 contentPadding:
                                     EdgeInsets.symmetric(vertical: 10),
                               ),
-                              onChanged: (text) {
-                                setState(() {
-                                  _isComposing = text.trim().isNotEmpty;
-                                });
-                              },
-                              onSubmitted: (_) => _sendMessage(),
+                              onSubmitted: (_) => controller.sendMessage(),
                             ),
                           ),
                           IconButton(
@@ -482,23 +452,26 @@ class _IndividualChatViewState extends State<IndividualChatView> {
                   const SizedBox(width: 8),
 
                   // Send or Mic Action Button
-                  GestureDetector(
-                    onTap: _isComposing ? _sendMessage : null,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _isComposing
-                            ? AppTheme.primaryColor
-                            : AppTheme.surfaceColorLight,
-                        shape: BoxShape.circle,
+                  Obx(() {
+                    final isComposing = controller.isComposing.value;
+                    return GestureDetector(
+                      onTap: isComposing ? controller.sendMessage : null,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isComposing
+                              ? AppTheme.primaryColor
+                              : AppTheme.surfaceColorLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isComposing ? Icons.send_rounded : Icons.mic_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
-                      child: Icon(
-                        _isComposing ? Icons.send_rounded : Icons.mic_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),

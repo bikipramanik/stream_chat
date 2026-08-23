@@ -19,7 +19,7 @@ class ChatView extends GetView<ChatController> {
           return Row(
             children: [
               GestureDetector(
-                key: controller.menuKey,
+                key: controller.menuKey,  
                 onTap: () => _showProfileMenu(context, user),
                 child: CircleAvatar(
                   radius: 18,
