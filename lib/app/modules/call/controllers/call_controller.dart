@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -23,6 +24,8 @@ class CallController extends GetxController {
   final callSeconds = 0.obs;
   Timer? _timer;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callDocSub;
+
+  final AudioPlayer _ringtonePlayer = AudioPlayer();
 
   RtcEngine? rtcEngine;
   final isEngineInitialized = false.obs;
@@ -86,10 +89,38 @@ class CallController extends GetxController {
     if (isIncomingCall) {
       callState.value = CallState.incoming;
       debugPrint("🔔 [CALL STATE] Set to INCOMING");
+      _playRingtone(isIncoming: true);
     } else {
       callState.value = CallState.outgoing;
       debugPrint("📞 [CALL STATE] Set to OUTGOING (Connecting...)");
+      _playRingtone(isIncoming: false);
       _initAgoraEngineAndJoin();
+    }
+  }
+
+  Future<void> _playRingtone({required bool isIncoming}) async {
+    try {
+      await _ringtonePlayer.stop();
+      await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
+      
+      // Clean phone ringing sound preview URL
+      final url = isIncoming
+          ? 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3'
+          : 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+
+      debugPrint("🔔 [RINGTONE] Playing ringtone audio (Incoming: $isIncoming): $url");
+      await _ringtonePlayer.play(UrlSource(url));
+    } catch (e) {
+      debugPrint("⚠️ [RINGTONE ERROR] Failed to play ringtone: $e");
+    }
+  }
+
+  Future<void> _stopRingtone() async {
+    try {
+      debugPrint("🔕 [RINGTONE] Stopping ringtone audio.");
+      await _ringtonePlayer.stop();
+    } catch (e) {
+      debugPrint("⚠️ [RINGTONE STOP ERROR] $e");
     }
   }
 
@@ -101,9 +132,11 @@ class CallController extends GetxController {
         debugPrint("🔥 [CALL FIRESTORE UPDATE] Status is now: '$status'");
         if (status == 'declined' || status == 'ended') {
           debugPrint("🚫 [CALL FIRESTORE] Call was declined or ended remotely.");
+          _stopRingtone();
           endCall(updateFirestore: false);
         } else if (status == 'accepted' && callState.value == CallState.outgoing) {
           debugPrint("✅ [CALL FIRESTORE] Remote user accepted the call!");
+          _stopRingtone();
           _startCallTimer();
           callState.value = CallState.connected;
         }
@@ -113,6 +146,7 @@ class CallController extends GetxController {
 
   Future<void> acceptCall() async {
     debugPrint("🟢 [CALL ACTION] Accept Call pressed by recipient");
+    _stopRingtone();
     callState.value = CallState.outgoing;
     await CallService.to.acceptCall(callDocId);
     await _initAgoraEngineAndJoin();
@@ -160,6 +194,7 @@ class CallController extends GetxController {
             debugPrint("🎉 [AGORA REMOTE JOINED] Remote UID: $remoteUidParam joined channel '${connection.channelId}' after ${elapsed}ms!");
             remoteUid.value = remoteUidParam;
             callState.value = CallState.connected;
+            _stopRingtone();
             _startCallTimer(reset: true);
           },
           onUserOffline:
@@ -270,6 +305,7 @@ class CallController extends GetxController {
     if (callState.value == CallState.ended) return;
     debugPrint("🔴 [CALL END] Ending Call. Update Firestore: $updateFirestore");
     callState.value = CallState.ended;
+    _stopRingtone();
     _timer?.cancel();
     _timer = null;
     _callDocSub?.cancel();
@@ -293,6 +329,8 @@ class CallController extends GetxController {
   @override
   void onClose() {
     debugPrint("🚪 [CALL CONTROLLER CLOSE] Cleaning up resources.");
+    _stopRingtone();
+    _ringtonePlayer.dispose();
     _timer?.cancel();
     _callDocSub?.cancel();
     try {
