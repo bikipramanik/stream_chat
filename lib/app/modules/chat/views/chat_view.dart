@@ -4,6 +4,7 @@ import 'package:stream_chat/app/data/models/user_model.dart';
 import 'package:stream_chat/app/modules/chat/controllers/chat_controller.dart';
 import 'package:stream_chat/app/modules/chat/views/individual_chat_view.dart';
 import 'package:stream_chat/app/modules/chat/widgets/user_card.dart';
+import 'package:stream_chat/app/routes/app_pages.dart';
 import 'package:stream_chat/app/theme/app_theme.dart';
 
 class ChatView extends GetView<ChatController> {
@@ -57,6 +58,11 @@ class ChatView extends GetView<ChatController> {
           );
         }),
         actions: [
+          IconButton(
+            tooltip: "Call History",
+            onPressed: () => Get.toNamed(Routes.CALL_HISTORY),
+            icon: const Icon(Icons.phone_in_talk_rounded, color: AppTheme.textPrimary),
+          ),
           IconButton(
             tooltip: "Sign Out",
             onPressed: () => _confirmSignOut(context),

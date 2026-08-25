@@ -9,6 +9,7 @@ abstract class Routes {
   static const CREATE_ACCOUNT = _Paths.CREATE_ACCOUNT;
   static const CHAT = _Paths.CHAT;
   static const CALL = _Paths.CALL;
+  static const CALL_HISTORY = _Paths.CALL_HISTORY;
 }
 
 abstract class _Paths {
@@ -17,4 +18,5 @@ abstract class _Paths {
   static const CREATE_ACCOUNT = '/create-account';
   static const CHAT = '/chat';
   static const CALL = '/call';
+  static const CALL_HISTORY = '/call-history';
 }

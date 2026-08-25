@@ -11,6 +11,8 @@ import '../modules/create_account/views/create_account_view.dart';
 
 import '../modules/call/bindings/call_binding.dart';
 import '../modules/call/views/call_view.dart';
+import '../modules/call_history/bindings/call_history_binding.dart';
+import '../modules/call_history/views/call_history_view.dart';
 
 part 'app_routes.dart';
 
@@ -39,6 +41,11 @@ class AppPages {
       name: _Paths.CALL,
       page: () => const CallView(),
       binding: CallBinding(),
+    ),
+    GetPage(
+      name: _Paths.CALL_HISTORY,
+      page: () => const CallHistoryView(),
+      binding: CallHistoryBinding(),
     ),
   ];
 }
