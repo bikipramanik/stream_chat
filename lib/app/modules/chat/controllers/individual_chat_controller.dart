@@ -70,16 +70,19 @@ class IndividualChatController extends GetxController {
     messageController.clear();
     isComposing.value = false;
 
+    debugPrint("✉️ [SEND MESSAGE START] 📤 From UID: '$currentUid' -> Receiver UID: '${targetUser.uid}' (${targetUser.userName}) | Text: '$text'");
+
     try {
       final chatDocRef = _firestore.collection('chats').doc(chatId);
       final messagesRef = chatDocRef.collection('messages');
 
-      await messagesRef.add({
+      final addedDoc = await messagesRef.add({
         'senderId': currentUid,
         'receiverId': targetUser.uid,
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
       });
+      debugPrint("✅ [MESSAGE ADDED TO FIRESTORE] 📦 Msg Doc ID: '${addedDoc.id}' in chats/'$chatId'/messages");
 
       await chatDocRef.set({
         'participants': [currentUid, targetUser.uid],
@@ -90,6 +93,7 @@ class IndividualChatController extends GetxController {
 
       scrollToBottom();
     } catch (e) {
+      debugPrint("❌ [SEND MESSAGE ERROR] 💥 $e");
       Get.snackbar(
         'Message Error',
         'Failed to send message: $e',

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:stream_chat/app/data/models/user_model.dart';
+import 'package:stream_chat/app/data/services/notification_service.dart';
 
 class AuthService extends GetxService {
   static AuthService get to => Get.find();
@@ -32,6 +33,11 @@ class AuthService extends GetxService {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         currentUser.value = UserModel.fromMap(doc.data()!, uid);
+        try {
+          if (Get.isRegistered<NotificationService>()) {
+            NotificationService.to.syncUserFcmToken(uid);
+          }
+        } catch (_) {}
       }
     } catch (e) {
       Get.log("Error fetching user data: $e");
